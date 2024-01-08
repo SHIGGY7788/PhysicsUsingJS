@@ -9,12 +9,14 @@ import Stats from 'stats.js';
 var gravity = -9.807;
 var ballMass = 40;
 var ballCount = 1;
+var oldCount = 1;
 var active_balls = [];
 var physics_balls = [];
-let initialized = false;
-let running = false;
+var initialized = false;
+var running = false;
 var show_shadows = false;
 var lightDebug = false;
+
 
 const stats = new Stats();
 const debugging = false;
@@ -88,19 +90,11 @@ const scene = new THREE.Scene();
 const defaultLight = new THREE.AmbientLight(0x404040, 5000);
 scene.add(defaultLight)
 
-//Light Rear
-const light = new THREE.PointLight(0xFFFFFF, 5);
-light.power = 1000;
-light.position.set(0, 15, 0);
 
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(-57, 47, 82);
+const helper = new THREE.DirectionalLightHelper(light, 5);
 
-//Light infront of the front wall
-const light2 = new THREE.SpotLight(0xFFFFFF, 25);
-light2.power = 5000;
-light2.position.set(0, -60, 50);
-const targetArea = new THREE.Object3D();
-targetArea.position.set(0, -40, 32);
-scene.add(targetArea);
 
 
 
@@ -200,6 +194,7 @@ function createGUI(gravity_slider, ball_mass_slider, ball_count_slider) {
 	const call_shadows = (
 		{
 			call_shadows: function () {
+				console.log(camera.position)
 				loadShadows();
 			}
 
@@ -231,7 +226,9 @@ function createGUI(gravity_slider, ball_mass_slider, ball_count_slider) {
 
 	});
 	gui.add(ball_count_slider, 'ballCount', 1, 50, 1).onChange(function (value) {
+		oldCount = ballCount;
 		ballCount = value;
+		changeBallCount();
 	});
 }
 createGUI({ gravity }, { ballMass }, { ballCount });
@@ -273,17 +270,48 @@ function animate() {
 	}
 	stats.end();
 }
-const helper1 = new THREE.PointLightHelper(light, 5);
-const helper2 = new THREE.SpotLightHelper(light2, 5);
+
+var height = 10;
+function changeBallCount() {
+	height = 10;
+	for (let i = 0; i != oldCount; i++) {
+		physicsWorld.removeBody(physics_balls[i]);
+	}
+	physics_balls.length = 0;
+
+	for (let i = 0; i != ballCount; i++) {
+		physics_balls[i] = new CANNON.Body({
+			mass: ballMass,
+			shape: new CANNON.Sphere(radius),
+			position: new CANNON.Vec3(0, 0, 0),
+		});
+		physics_balls[i].position.set(0, height, 0)
+		physics_balls[i].quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+		physicsWorld.addBody(physics_balls[i]);
+		height += 4;
+	}
+
+
+	for (let i = 0; i != oldCount; i++) {
+		scene.remove(active_balls[i]);
+	}
+	active_balls.length = 0;
+
+	for (let i = 0; i != ballCount; i++) {
+		active_balls[i] = new THREE.Mesh(sphere_geometry, sphere_material);
+		active_balls[i].position.copy(physics_balls[i].position);
+		scene.add(active_balls[i]);
+	};
+
+}
+
 function debugLights() {
 	if (!lightDebug) {
-		scene.add(helper1);
-		scene.add(helper2);
+		scene.add(helper)
 		lightDebug = true;
 	}
 	else {
-		scene.remove(helper1);
-		scene.remove(helper2);
+		scene.remove(helper)
 		lightDebug = false;
 	}
 }
@@ -292,10 +320,8 @@ function loadShadows() {
 	if (!show_shadows) {
 		renderer.shadowMap.enabled = true;
 		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-		light.castShadow = true;
-		light2.castShadow = true;
+
 		scene.add(light);
-		scene.add(light2);
 		scene.remove(defaultLight);
 
 		active_balls.forEach((ball) => {
@@ -319,17 +345,13 @@ function loadShadows() {
 	}
 	else {
 		renderer.shadowMap.enabled = false;
-		light.castShadow = false;
-		light2.castShadow = false;
+		scene.remove(light);
 		scene.add(defaultLight);
 		active_balls.forEach((ball) => {
 			ball.castShadow = false;
 			ball.receiveShadow = false;
 		}
 		);
-		scene.remove(light);
-		scene.remove(light2);
-		scene.add(defaultLight);
 		floor.receiveShadow = false;
 		back_wall.receiveShadow = false;
 		left_wall.receiveShadow = false;
