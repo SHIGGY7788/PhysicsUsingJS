@@ -5,6 +5,9 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import * as CANNON from 'cannon-es';
 import CannonDebugger from 'cannon-es-debugger';
 import Stats from 'stats.js';
+//import { Interaction } from 'three.interaction';
+//const interaction = new Interaction(renderer, scene, camera);
+//https://stackoverflow.com/questions/17638933/three-js-clickable-objects <<!!
 // Constants and Variables
 var gravity = -9.807;
 var ballMass = 40;
@@ -16,6 +19,7 @@ var initialized = false;
 var running = false;
 var show_shadows = false;
 var lightDebug = false;
+var obj_movements = false;
 
 
 const stats = new Stats();
@@ -105,7 +109,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 console.log("ball mass: " + ballMass + "\n")
 // Floor
 const floor_geometry = new THREE.BoxGeometry(30, 60, 40);
-const floor_material = new THREE.MeshLambertMaterial({ color: 0xA9A9A9});
+const floor_material = new THREE.MeshLambertMaterial({ color: 0xA9A9A9 });
 const floor = new THREE.Mesh(floor_geometry, floor_material);
 // Real Back wall
 const back_wall_geometry = new THREE.BoxGeometry(2, 60, 30);
@@ -200,6 +204,22 @@ function createGUI(gravity_slider, ball_mass_slider, ball_count_slider) {
 
 		}
 	);
+	const obj_debug = (
+		{
+			obj_debug: function () {
+				if (obj_movements == false) {
+					obj_movements = true;
+					enable_obj_movement();
+					console.log("Object movements enabled");
+				} else {
+					obj_movements = false;
+					enable_obj_movement();
+					console.log("Object movements disabled");
+				}
+				
+			}
+		}
+	);
 	const call_debug_lights = (
 		{
 			call_debug_lights: function () {
@@ -209,6 +229,7 @@ function createGUI(gravity_slider, ball_mass_slider, ball_count_slider) {
 	);
 
 	gui.add(call_debug_lights, 'call_debug_lights');
+	gui.add(obj_debug, 'obj_debug')
 	gui.add(call_shadows, 'call_shadows');
 	gui.add(reset_values, 'reset_values');
 	gui.add(start_sim, 'run');
@@ -268,6 +289,11 @@ function animate() {
 		}
 		lastCallTime = time
 	}
+	if (obj_movements) {
+		helpers.forEach((helper) => {
+			helper.update();
+		});
+	}
 	stats.end();
 }
 
@@ -303,6 +329,48 @@ function changeBallCount() {
 		scene.add(active_balls[i]);
 	};
 
+}
+
+//Create a custom axis helper that extends threejs
+class CustomAxisHelper extends THREE.Object3D {
+	constructor(size) {
+		super();
+		const arrowSize = size * 2; // Increase the arrow size
+		this.add(new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), arrowSize, 0xff0000));
+		this.add(new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), arrowSize, 0x00ff00));
+		this.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), arrowSize, 0x0000ff));
+	}
+}
+
+const helpers = [];
+function enable_obj_movement() {
+	if (obj_movements == true) {
+		// Add helpers to each three-js object in the scene
+		scene.traverse((obj) => {
+			if (obj.type === 'Mesh') {
+				const helper = new THREE.BoxHelper(obj, 0xffa500);
+				helper.visible = true;
+				scene.add(helper);
+				helpers.push(helper);
+
+
+
+			}
+			active_balls.forEach((ball) => {
+				const helper = new CustomAxisHelper(3);
+				helper.visible = true;
+				helper.position.copy(ball.position); // Set the position of the helper to match the ball
+				scene.add(helper);
+				helpers.push(helper);
+			});
+		});
+	}
+	if (obj_movements == false) {
+		helpers.forEach((helper) => {
+			scene.remove(helper);
+		});
+		helpers.length = 0;
+	}
 }
 
 function debugLights() {
@@ -376,6 +444,9 @@ function restartSimulation() {
 		physics_balls[i].quaternion.setFromEuler(-Math.PI / 2, 0, 0);
 		active_balls[i].position.copy(physics_balls[i].position);
 		active_balls[i].quaternion.copy(physics_balls[i].quaternion);
+		if (obj_movements) {
+			helpers[i].update();
+		}
 	}
 	stats.end()
 	show_initial();
