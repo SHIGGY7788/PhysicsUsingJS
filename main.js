@@ -5,9 +5,8 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import * as CANNON from 'cannon-es';
 import CannonDebugger from 'cannon-es-debugger';
 import Stats from 'stats.js';
-//import { Interaction } from 'three.interaction';
-//const interaction = new Interaction(renderer, scene, camera);
-//https://stackoverflow.com/questions/17638933/three-js-clickable-objects <<!!
+
+
 // Constants and Variables
 var gravity = -9.807;
 var ballMass = 40;
@@ -91,6 +90,8 @@ const renderer = new THREE.WebGLRenderer();
 const scene = new THREE.Scene();
 
 
+
+
 const defaultLight = new THREE.AmbientLight(0x404040, 5000);
 scene.add(defaultLight)
 
@@ -157,6 +158,10 @@ const plane_wall_split_2 = new THREE.Mesh(plane_wall_split_geometry, plane_wall_
 const cannonDebugger = new CannonDebugger(scene, physicsWorld, {
 	color: 0xff0000,
 });
+
+
+
+
 // Axes Helper
 const axesHelper = new THREE.AxesHelper(5);
 
@@ -452,6 +457,41 @@ function restartSimulation() {
 	show_initial();
 }
 
+//Raycasting
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function onPointerMove( event ) {
+
+	// calculate pointer position in normalized device coordinates
+	// (-1 to +1) for both components
+
+	pointer.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+	pointer.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+}
+
+function render() {
+	console.log("rendering");
+	// update the picking ray with the camera and pointer position
+	raycaster.setFromCamera( pointer, camera );
+
+	// calculate objects intersecting the picking ray
+	const intersects = raycaster.intersectObjects( scene.children, false );
+
+	for ( let i = 0; i < intersects.length; i ++ ) {
+		console.log(intersects[ i ].object.name);
+		intersects[ i ].object.material.color.set( 0xffa500 ); // Set color to orange
+
+	}
+
+	renderer.render( scene, camera );
+
+}
+
+document.addEventListener( 'pointermove', onPointerMove );
+
+window.requestAnimationFrame(render);
 
 function load() {
 	stats.showPanel(0);
